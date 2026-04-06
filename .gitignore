@@ -1,0 +1,31 @@
+# Compiled output
+build/
+out/
+target/
+
+# Gradle
+.gradle/
+gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Spring Boot
+application-local.properties
+application-local.yml
+
+# Secrets — never commit real keys
+application-prod.properties
+application-prod.yml
