@@ -12,6 +12,9 @@ public class WompiMerchantResponse {
     public static class MerchantData {
         @JsonProperty("presigned_acceptance")
         private PresignedAcceptance presignedAcceptance;
+
+        @JsonProperty("presigned_personal_data_auth")
+        private PresignedAcceptance presignedPersonalDataAuth;
     }
 
     @Data

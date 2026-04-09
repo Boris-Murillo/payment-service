@@ -18,6 +18,7 @@ gradle/wrapper/gradle-wrapper.jar
 *.log
 logs/
 
+
 # OS
 .DS_Store
 Thumbs.db

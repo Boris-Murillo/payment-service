@@ -28,6 +28,12 @@ public class WompiCreateTransactionRequest {
     @JsonProperty("acceptance_token")
     private String acceptanceToken;
 
+    @JsonProperty("acceptance_personal_auth")
+    private String acceptancePersonalAuth;
+
+    @JsonProperty("signature")
+    private String integritySignature;
+
     /** Required for async methods: PSE, Nequi, Daviplata */
     @JsonProperty("redirect_url")
     private String redirectUrl;

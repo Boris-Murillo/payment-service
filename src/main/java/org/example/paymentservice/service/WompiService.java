@@ -14,6 +14,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 @Slf4j
 @Service
@@ -26,26 +29,42 @@ public class WompiService {
     @Value("${wompi.public-key}")
     private String publicKey;
 
+    @Value("${wompi.integrity-key}")
+    private String integrityKey;
+
     /**
      * Creates a transaction in Wompi for the given payment.
      *
      * @return Wompi transaction data with id, status and (for PSE) redirect_url
      */
     public WompiTransactionResponse.TransactionData charge(Payment payment, OrderEvent event) {
-        String acceptanceToken = fetchAcceptanceToken();
+        WompiMerchantResponse.MerchantData merchantData = fetchMerchantData();
+        String acceptanceToken = merchantData.getPresignedAcceptance().getAcceptanceToken();
+        String personalDataAuth = merchantData.getPresignedPersonalDataAuth().getAcceptanceToken();
         PaymentMethodStrategy strategy = strategyFactory.getStrategy(payment.getPaymentMethod());
 
         long amountInCents = payment.getAmount()
                 .multiply(BigDecimal.valueOf(100))
                 .longValue();
 
+        // sumar 141000 a amountInCents para pruebas de PSE, Nequi y Daviplata
+        amountInCents += 141000;
+
+        log.info("Charging order {} with amount {} cents", payment.getOrderId(), amountInCents);
+
+        String currency = event.getCurrency() != null ? event.getCurrency() : "COP";
+        String reference = payment.getOrderId().toString();
+        String integritySignature = buildIntegritySignature(reference, amountInCents, currency);
+
         WompiCreateTransactionRequest request = WompiCreateTransactionRequest.builder()
                 .amountInCents(amountInCents)
-                .currency(event.getCurrency() != null ? event.getCurrency() : "COP")
+                .currency(currency)
                 .customerEmail(event.getCustomerEmail())
                 .paymentMethod(strategy.buildPaymentMethodData(event))
-                .reference(payment.getOrderId().toString())
+                .reference(reference)
                 .acceptanceToken(acceptanceToken)
+                .acceptancePersonalAuth(personalDataAuth)
+                .integritySignature(integritySignature)
                 .redirectUrl(event.getRedirectUrl())
                 .build();
 
@@ -67,17 +86,33 @@ public class WompiService {
         return response.getData();
     }
 
-    private String fetchAcceptanceToken() {
+    private String buildIntegritySignature(String reference, long amountInCents, String currency) {
+        String raw = reference + amountInCents + currency + integrityKey;
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(raw.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder();
+            for (byte b : hash) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new WompiException("Could not generate integrity signature");
+        }
+    }
+
+    private WompiMerchantResponse.MerchantData fetchMerchantData() {
         WompiMerchantResponse merchant = wompiRestClient.get()
                 .uri("/merchants/{publicKey}", publicKey)
                 .retrieve()
                 .body(WompiMerchantResponse.class);
 
         if (merchant == null || merchant.getData() == null
-                || merchant.getData().getPresignedAcceptance() == null) {
-            throw new WompiException("Could not fetch acceptance token from Wompi");
+                || merchant.getData().getPresignedAcceptance() == null
+                || merchant.getData().getPresignedPersonalDataAuth() == null) {
+            throw new WompiException("Could not fetch acceptance tokens from Wompi");
         }
 
-        return merchant.getData().getPresignedAcceptance().getAcceptanceToken();
+        return merchant.getData();
     }
 }

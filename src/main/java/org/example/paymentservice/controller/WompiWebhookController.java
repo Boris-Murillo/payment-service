@@ -21,11 +21,13 @@ public class WompiWebhookController {
 
     private final PaymentService paymentService;
 
-    @Value("${wompi.integrity-key}")
-    private String integrityKey;
+    @Value("${wompi.event-key}")
+    private String eventKey;
 
     @PostMapping("/wompi")
     public ResponseEntity<Void> handleWompiEvent(@RequestBody WompiWebhookEvent event) {
+        // imprimir el evento completo para debugging
+        log.debug("Received Wompi webhook event: {}", event);
         if (!isValidSignature(event)) {
             log.warn("Invalid Wompi webhook signature for event {}", event.getEvent());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -63,7 +65,7 @@ public class WompiWebhookController {
                 }
             }
             message.append(event.getTimestamp());
-            message.append(integrityKey);
+            message.append(eventKey);
 
             String computed = sha256Hex(message.toString());
             return computed.equals(sig.getChecksum());
